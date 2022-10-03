@@ -90,15 +90,28 @@ local function Init_TypeLockSystem()
             NumberSequence = true;
         };
     };
-
+    --[[
+        ClassType Guide:
+        NULL: Attribute is Read-Only.
+        0: Accepts all values, including nil.
+        1: Accepts all values, except nil.
+        2: Accepts Instance values of a certain type, can be nil.
+        3: Accepts non-Instance values of a certain type, can be nil.
+        4: Accepts Instance values of a certain type, can't be nil.
+        5: Accepts non-Instance values of a certain type, can't be nil.
+    --]]
     function DendroUI.Functions.CheckType(Value, TypeString)
+        if (not TypeString or #TypeString == 0) then error("This Attribute is Read-Only."); end;
         local ClassType = TypeString:byte();
         TypeString = TypeString:sub(2);
-        if (ClassType == 0) then
+        if (ClassType == 0) then return true; end;--Attribute accepts any value.
+        if (ClassType == 1 and Value ~= nil) then return true; end;
+        if ((ClassType == 2 or ClassType == 3) and Value == nil) then return true; end;--Attribute accepts nil values.
+        if (ClassType == 2 or ClassType == 4) then--IsA Check
             if (typeof(Value) ~= "Instance") then return false; end;
             return Value:IsA(TypeString);
         end;
-        if (Routes[TypeString]) then
+        if (Routes[TypeString]) then--typeof Check
             return (Routes[TypeString][typeof(Value)] ~= nil);
         end;
         return typeof(Value) == TypeString;
@@ -120,4 +133,6 @@ function DendroUI:Initiate()
     Init_DendroEnums();
     Init_DendroUI();
 end;
+
+return DendroUI;
 --#endregion
