@@ -6,10 +6,11 @@
 --#region Setup
 DendroUI = {
     Settings = {
+        CreateCorners = true;
         CreateBorders = false;
 
         DisplayIntro = true;
-        PrintCredits = false;
+        PrintWatermark = false;
     };
 };
 --#region Services
@@ -132,6 +133,8 @@ function DendroUI:Initiate()
     Init_DendroDefaults();
     Init_DendroEnums();
     Init_DendroUI();
+    DendroUI._Settings = DendroUI.Settings;
+    DendroUI.Settings = nil;
 end;
 
 return DendroUI;
