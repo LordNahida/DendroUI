@@ -7,7 +7,7 @@
 DendroUI = {
     Settings = {
         CreateCorners = true;
-        CreateBorders = false;
+        CreateBorders = true;
 
         DisplayIntro = true;
         PrintWatermark = false;
