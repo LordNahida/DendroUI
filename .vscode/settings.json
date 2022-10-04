@@ -3,6 +3,7 @@
         "game",
         "Instance",
         "Color3",
-        "typeof"
+        "typeof",
+        "Enum"
     ]
 }

@@ -46,13 +46,17 @@ local function Init_DendroDefaults()
             PrimaryColor = Color3.fromRGB();--Frames
             SecondaryColor = Color3.fromRGB();--Buttons & Controls
             DisabledColor = Color3.fromRGB();--Diabled Controls
-            Transparency = 0;
         };
-        Border = {
+        Stroke = {
             Visible = false;
-            Color = Color3.fromRGB();
-            Transparency = 0;
+            Style = Enum.LineJoinMode.Round;
             Thickness = 0;
+            PrimaryColor = Color3.fromRGB();
+            SecondaryColor = Color3.fromRGB();
+            DisabledColor = Color3.fromRGB();
+            PrimaryTransparency = 0;
+            SecondaryTransparency = 0;
+            DisabledTransparency = 0;
         };
         Text = {
             Color = Color3.fromRGB();
@@ -74,13 +78,18 @@ end;
 local function Init_DendroUI()
     local ProxyDictionary = {};
     local MetaDictionary = {};
-    function DendroUI.Functions.GetMeta(self)
+
+    function DendroUI.Functions.GetSproutMeta(self)
         return MetaDictionary[self];
     end;
 
     function DendroUI.Functions.GetProxy(self)
         if (not self) then return self; end;
         return (ProxyDictionary[self] or self);
+    end;
+
+    function DendroUI.Functions.GetRawInstance(self)
+        return MetaDictionary[self].Components.Main;
     end;
 
     local DendroMeta = {
@@ -91,6 +100,7 @@ local function Init_DendroUI()
             local Meta = MetaDictionary[self];
             if (Meta.ClassData.Methods[Field]) then return Meta.ClassData.Methods; end;
             if (Meta.ClassData.Attributes[Field]) then return Meta.Attributes[Field]; end;
+            if (Meta.Events[Field]) then return Meta.Events[Field].Event; end;
             local Child = Meta.Components.ChildContainer;
             if (not Child) then error("Unable to index " .. Field .. "."); end;
             Child = DendroUI.Functions.GetProxy(Child:FindFirstChild(Field));
@@ -115,50 +125,126 @@ local function Init_DendroUI()
     };
 
     local BaseClasses = {
-        BaseInstance = {
+        DendroSprout = {
             Methods = {
-                AddChild = function (self, Child)
-                    Child.Parent = MetaDictionary[self].ChildContainer;
-                end;
-                GetChildren = function (self)
+                Destroy = function (self)
                     local Meta = MetaDictionary[self];
-                    local Children = Meta.Components.ChildContainer;
-                    if (not Children) then error("This Element cannot contain children."); end;
-                    Children = Children:GetChildren();
-                    for _, Child in pairs(Children) do
-                        Children[_] = DendroUI.Functions.GetProxy(Child);
+                    ProxyDictionary[Meta.Components.Main] = nil;
+                    for _, Component in pairs(Meta.Components) do
+                        Component:Destroy();
+                        Meta.Components[_] = nil;
                     end;
-                end;
-                GetDendroChildren = function (self)
-                    local Meta = MetaDictionary[self];
-                    local Children = Meta.Components.ChildContainer;
-                    if (not Children) then error("This Element cannot contain children."); end;
-                    Children = Children:GetChildren();
-                    local DendroChildren = {};
-                    for _, Child in pairs(Children) do
-                        Child = ProxyDictionary[Child];
-                        if (Child) then table.insert(DendroChildren, Child); end;
+                    for _, Event in pairs(Meta.Events) do
+                        Event:Destroy();
                     end;
+                    for _, MetaField in pairs(Meta) do
+                        Meta[MetaField] = nil;
+                    end;
+                    MetaDictionary[self] = nil;
                 end;
+                GetSproutMeta = DendroUI.Functions.GetSproutMeta;
+                GetRawInstance = DendroUI.Functions.GetRawInstance;
             };
             Attributes = {
+                ClassName = {};
+            };
+            Routing = {
+                Name = "Main\0Name";
+            };
+            Events = {"Changed"};
+        };
+        DendroAncestry = {
+            Attributes = {
                 Parent = {
-                    TypeString = "\3Instance";
+                    TypeString = "BaseInstance";
                     Redraw = function (self, Value)
+                        Value = DendroUI.Functions.GetProxy(Value);
                         local Meta = MetaDictionary[self];
-                        Meta.Components.Main.Parent = Value;
-                    end;
-                };
-                Name = {
-                    TypeString = "\3string";
-                    Redraw = function (self, Value)
-                        local Meta = MetaDictionary[self];
-                        Meta.Components.Main.Name = Value;
+                        Meta.Main.Parent = DendroUI.Functions.GetRawInstance(Value);
+                        Meta.Attributes.Parent = Value;
                     end;
                 };
             };
+            Methods = {
+                GetChildren = function (self)
+                    local Meta = MetaDictionary[self];
+                    local Children = Meta.Components.ChildContainer:GetChildren();
+                    for _, Child in pairs(Children) do if (ProxyDictionary[Child]) then Children[_] = ProxyDictionary[Child]; end; end;
+                    return Children;
+                end;
+                GetSprouts = function (self)
+                    local Meta = MetaDictionary[self];
+                    local Children = {};
+                    for _, Child in pairs(Meta.Components.ChildContainer:GetChildren()) do
+                        if (ProxyDictionary[Child]) then
+                            table.insert(Children, ProxyDictionary[Child]);
+                        end;
+                    end;
+                    return Children;
+                end;
+                GetRawChildren = function (self)
+                    return MetaDictionary[self].Components.ChildContainer:GetChildren();
+                end;
+                ClearAllChildren = function (self)
+                    local Meta = MetaDictionary[self];
+                    local Children = Meta.Components.ChildContainer:GetChildren();
+                    for _, Child in pairs(Children) do DendroUI.Functions.GetProxy(Child):Destroy(); end;
+                end;
+                AddChild = function (self, Child)
+                    local Meta = MetaDictionary[self];
+                    Child.Parent = Meta.Components.ChildContainer;
+                end;
+            };
         };
-    }
+        DendroRender = {
+            Routing = {
+                AbsoluteSize = "Main\0AbsoluteSize";
+                AbsolutePosition = "Main\0AbsolutePosition";
+                Visible = "Main\0Visible";
+                ZIndex = "Main\0ZIndex";
+            };
+        };
+        DendroBase2D = {
+            Routing = {
+                AutomaticSize = "Main\0AutomaticSize";
+                LayoutOrder = "Main\0LayoutOrder";
+                Position = "Main\0Position";
+                Size = "Main\0Size";
+                AnchorPoint = "Main\0AnchorPoint";
+                Rotation = "Main\0Rotation";
+                SizeConstraint = "Main\0SizeConstraint";
+                TweenPosition = "Main\0TweenPosition";
+                TweenSize = "Main\0TweenSize";
+                TweenSizeAndPosition = "Main\0TweenSizeAndPosition";
+            };
+        };
+        DendroInput = {
+            Routing = {
+                Active = "InputObject\0Active";
+                InputBegan = "InputObject\0InputBegan";
+                InputEnded = "InputObject\0InputEnded";
+                MouseEnter = "InputObject\0MouseEnter";
+                MouseLeave = "InputObject\0MouseLeave";
+                MouseWheelForward = "InputObject\0MouseWheelForward";
+                MouseWheelBackward = "InputObject\0MouseWheelBackward";
+            };
+        };
+        DendroBackground = {
+            Routing = {
+                CornerRadius = "UICorner\0CornerRadius";
+                Color = "Background\0BackgroundColor3";
+                Transparency = "Background\0BackgroundTransparency";
+                StrokeColor = "UIStroke\0Color";
+                StrokeTransparency = "UIStroke\0Transparency";
+                StrokeThickness = "UIStroke\0Thickness";
+                StrokeMode = "UIStroke\0ApplyStokeMode";
+                StrokeStyle = "UIStroke\0LineJoinMode";
+                StrokeVisible = "UIStroke\0Enabled";
+            };
+        };
+    };
+
+    
 end;
 --#endregion
 --#endregion
@@ -167,7 +253,7 @@ end;
 DendroUI.Functions = {};
 local function Init_RoutingSystem()
     function DendroUI.ApplyRouting(self, Field)
-        local Meta = DendroUI.Functions.GetMeta(self);
+        local Meta = DendroUI.Functions.GetSproutMeta(self);
         if (not Meta) then error("The first argument must be a DendroUI Element."); end;
         local RoutingString = Meta.ClassData.Routing[Field];
         if (not RoutingString) then return self, Field; end;
@@ -205,6 +291,7 @@ local function Init_TypeLockSystem()
     --]]
     function DendroUI.Functions.CheckType(Value, TypeString)
         if (not TypeString or #TypeString == 0) then error("This Attribute is Read-Only."); end;
+        if (TypeString == "BaseInstance") then return typeof(Value) == "Instance" or DendroUI.Functions.GetSproutMeta(Value) ~= nil; end;
         local ClassType = TypeString:byte();
         TypeString = TypeString:sub(2);
         if (ClassType == 0) then return true; end;--Attribute accepts any value.
