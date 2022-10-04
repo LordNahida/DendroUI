@@ -72,13 +72,115 @@ end;
 
 --#region DendroUI
 local function Init_DendroUI()
-    
+    local ProxyDictionary = {};
+    local MetaDictionary = {};
+    function DendroUI.Functions.GetMeta(self)
+        return MetaDictionary[self];
+    end;
+
+    function DendroUI.Functions.GetProxy(self)
+        if (not self) then return self; end;
+        return (ProxyDictionary[self] or self);
+    end;
+
+    local DendroMeta = {
+        __index = function (self, Field)
+            local Self = self;
+            self, Field = DendroUI.Functions.ApplyRouting(self, Field);
+            if (Self ~= self) then return self[Field]; end;
+            local Meta = MetaDictionary[self];
+            if (Meta.ClassData.Methods[Field]) then return Meta.ClassData.Methods; end;
+            if (Meta.ClassData.Attributes[Field]) then return Meta.Attributes[Field]; end;
+            local Child = Meta.Components.ChildContainer;
+            if (not Child) then error("Unable to index " .. Field .. "."); end;
+            Child = DendroUI.Functions.GetProxy(Child:FindFirstChild(Field));
+            if (not Child) then error("Unable to index ".. Field .. "."); end;
+            return Child;
+        end;
+        __newindex = function (self, Field, Value)
+            local Self = self;
+            self, Field = DendroUI.Functions.ApplyRouting(self, Field);
+            if (Self ~= self) then self[Field] = Value; return; end;
+            local Meta = MetaDictionary[self];
+            local TypeString = Meta.ClassData.Attributes[Field];
+            if (not TypeString) then error("Unable to find " .. Field .. "."); end;
+            TypeString = TypeString.TypeString;
+            if (not DendroUI.CheckType(Value, TypeString)) then error("Invalid type for " .. Field .. "."); end;
+            Meta.ClassData.Attributes[Field].Redraw(self, Value);
+        end;
+        __tostring = function (self)
+            local Meta = MetaDictionary[self];
+            return (Meta.Attributes.Name or Meta.Attributes.ClassName or Meta.Pointer or "DendroUIElement");
+        end;
+    };
+
+    local BaseClasses = {
+        BaseInstance = {
+            Methods = {
+                AddChild = function (self, Child)
+                    Child.Parent = MetaDictionary[self].ChildContainer;
+                end;
+                GetChildren = function (self)
+                    local Meta = MetaDictionary[self];
+                    local Children = Meta.Components.ChildContainer;
+                    if (not Children) then error("This Element cannot contain children."); end;
+                    Children = Children:GetChildren();
+                    for _, Child in pairs(Children) do
+                        Children[_] = DendroUI.Functions.GetProxy(Child);
+                    end;
+                end;
+                GetDendroChildren = function (self)
+                    local Meta = MetaDictionary[self];
+                    local Children = Meta.Components.ChildContainer;
+                    if (not Children) then error("This Element cannot contain children."); end;
+                    Children = Children:GetChildren();
+                    local DendroChildren = {};
+                    for _, Child in pairs(Children) do
+                        Child = ProxyDictionary[Child];
+                        if (Child) then table.insert(DendroChildren, Child); end;
+                    end;
+                end;
+            };
+            Attributes = {
+                Parent = {
+                    TypeString = "\3Instance";
+                    Redraw = function (self, Value)
+                        local Meta = MetaDictionary[self];
+                        Meta.Components.Main.Parent = Value;
+                    end;
+                };
+                Name = {
+                    TypeString = "\3string";
+                    Redraw = function (self, Value)
+                        local Meta = MetaDictionary[self];
+                        Meta.Components.Main.Name = Value;
+                    end;
+                };
+            };
+        };
+    }
 end;
 --#endregion
 --#endregion
 
 --#region DendroFunctions
 DendroUI.Functions = {};
+local function Init_RoutingSystem()
+    function DendroUI.ApplyRouting(self, Field)
+        local Meta = DendroUI.Functions.GetMeta(self);
+        if (not Meta) then error("The first argument must be a DendroUI Element."); end;
+        local RoutingString = Meta.ClassData.Routing[Field];
+        if (not RoutingString) then return self, Field; end;
+        if (RoutingString:find("\0")) then--IndirectRouting
+            local Component = RoutingString:sub(1, RoutingString:find("\0") - 1);
+            Field = RoutingString:sub(RoutingString:find("\0") + 1);
+            return Meta.Components[Component], Field;
+        else--DirectRouting
+            return self, RoutingString;
+        end;
+    end;
+end;
+
 local function Init_TypeLockSystem()
     local Routes = {
         BaseColor = {
@@ -97,9 +199,9 @@ local function Init_TypeLockSystem()
         0: Accepts all values, including nil.
         1: Accepts all values, except nil.
         2: Accepts Instance values of a certain type, can be nil.
-        3: Accepts non-Instance values of a certain type, can be nil.
+        3: Accepts values of a certain type, can be nil.
         4: Accepts Instance values of a certain type, can't be nil.
-        5: Accepts non-Instance values of a certain type, can't be nil.
+        5: Accepts values of a certain type, can't be nil.
     --]]
     function DendroUI.Functions.CheckType(Value, TypeString)
         if (not TypeString or #TypeString == 0) then error("This Attribute is Read-Only."); end;
@@ -131,6 +233,7 @@ end;
 function DendroUI:Initiate()
     Init_TypeLockSystem();
     Init_DendroDefaults();
+    Init_RoutingSystem();
     Init_DendroEnums();
     Init_DendroUI();
     DendroUI._Settings = DendroUI.Settings;
