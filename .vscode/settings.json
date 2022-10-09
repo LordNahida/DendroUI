@@ -4,6 +4,16 @@
         "Instance",
         "Color3",
         "typeof",
-        "Enum"
+        "Enum",
+        "UDim2",
+        "Rect",
+        "UDim",
+        "Vector2",
+        "wait"
+    ],
+    "Lua.diagnostics.disable": [
+        "unused-function",
+        "deprecated",
+        "param-type-mismatch"
     ]
 }
